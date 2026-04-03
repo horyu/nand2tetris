@@ -32,5 +32,45 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-	//// Replace this comment with your code.
+    // 5432109876543210
+    // 1__accccccdddjjj
+    Or16(a= instruction, b= false, out[15]= i0, out[12]= a, out[11]= c0, out[10]= c1, out[9]= c2, out[8]= c3, out[7]= c4, out[6]= c5, out[5]= d0, out[4]= d1, out[3]= d2, out[2]= j0, out[1]= j1, out[0]= j2);
+    And(a= i0, b= d2, out= writeM);
+    // A Register
+    // sel = i0 & d0
+    And(a= i0, b= d0, out= aSel);
+    Mux16(a= instruction, b= aluOut, sel= aSel, out= aRegIn);
+    // load = !i0 | aSel(i0 & d0)
+    Not(in= i0, out= i0r);
+    Or(a= i0r, b= aSel, out= load);
+    ARegister(in= aRegIn, load= load, out= aRegOut);
+    Or16(a= aRegOut, b= false, out[0..14]= addressM);
+    // D Register 
+    // load = i0 & d1
+    And(a= i0, b= d1, out= dRegLoad);
+    DRegister(in= aluOut, load= dRegLoad, out= aluInX);
+    // ALU
+    Mux16(a= aRegOut, b= inM, sel= a, out= aluInY);
+    ALU(x= aluInX, y= aluInY, zx= c0, nx= c1, zy= c2, ny= c3, f= c4, no= c5, out= aluOut, zr= zr, ng= ng);
+    Or16(a= aluOut, b= false, out= outM);
+    // jump
+    // ps(PoSitive) = !(zr|ng) = !zr & !ng
+    Not(in= zr, out= zrr);
+    Not(in= ng, out= ngr);
+    And(a= zrr, b= ngr, out= ps);
+    // zrNg = zr|ng; zrPs = zr|ps
+    Or(a= zr, b= ng, out= zrNg);
+    Or(a= zr, b= ps, out= zrPs);
+    DMux8Way(in= true, sel[2]= j0, sel[1]= j1, sel[0]=j2, a= fasle, b= jgt, c= jeq, d= jge, e= jlt, f= jne, g= jle, h= jmp);
+    // shouldJump = jmpOr&i0
+    And(a= jgt, b= ps, out= jgtRs);
+    And(a= jeq, b= zr, out= jeqRs);
+    And(a= jge, b= zrPs, out= jgeRs);
+    And(a= jlt, b= ng, out= jltRs);
+    And(a= jne, b= zrr, out= jneRs);
+    And(a= jle, b= zrNg, out= jleRs);
+    Or8Way(in[0]= jgtRs, in[1]= jeqRs, in[2]= jgeRs, in[3]= jltRs, in[4]= jneRs, in[5]= jleRs, in[6]= jmp, out= jmpOr);
+    And(a= jmpOr, b= i0, out= shouldJump);
+    // PC
+    PC(in= aRegOut, load= shouldJump, inc= true, reset= reset, out[0..14]= pc);
 }
